@@ -1,0 +1,9 @@
+# dsh-cache-diagnostics bundle patch.
+# Inserted into the profile composition when installed via
+#   dsh plugin --profile web add link:<this-package-path>
+# The plugin row resolves the package by name through the profile's node_modules;
+# the browser half registers the cache-diagnostics conversation node, the
+# per-step cache-status line, and the right-sidebar diagnostics tab.
+- insert:
+    - id: cache-diagnostics
+      name: 'dsh-cache-diagnostics'
