@@ -178,6 +178,8 @@ export function rowsFromEvents(
   let currentSystem: number | undefined
   /** Sequence that was in force at the previous request header. */
   let lastHeaderSystem: number | undefined
+  /** False until the first header, so "no system yet" is not read as a change. */
+  let headerSeen = false
   let pendingChange: CacheRow['changeKind']
   let pendingSystemChanged = false
   let pendingToolsChanged = false
@@ -254,7 +256,7 @@ export function rowsFromEvents(
       if (typeof model === 'string') lastModel = model
       const tools = hashOf(header.tools ?? null)
       const toolsChanged = lastTools !== undefined && tools !== lastTools
-      const systemChanged = lastHeaderSystem !== undefined && currentSystem !== lastHeaderSystem
+      const systemChanged = headerSeen && currentSystem !== lastHeaderSystem
       const changeKind: CacheRow['changeKind'] = lastTools === undefined
         ? 'initial'
         : toolsChanged && systemChanged
@@ -266,6 +268,7 @@ export function rowsFromEvents(
               : undefined
       lastTools = tools
       lastHeaderSystem = currentSystem
+      headerSeen = true
       if (open !== undefined) {
         open.provider = provider ?? open.provider
         open.model = model ?? open.model
@@ -331,24 +334,4 @@ export function rowsFromEvents(
   }
 
   return rows
-}
-
-/** The page's own summary line. */
-export function summarize(rows: readonly CacheRow[]): {
-  count: number
-  hitRate?: number
-  input: number
-  cacheRead: number
-  cacheWrite: number
-} {
-  let input = 0
-  let cacheRead = 0
-  let cacheWrite = 0
-  for (const row of rows) {
-    input += row.input
-    cacheRead += row.cacheRead
-    cacheWrite += row.cacheWrite
-  }
-  const total = input + cacheRead + cacheWrite
-  return { count: rows.length, hitRate: total > 0 ? cacheRead / total : undefined, input, cacheRead, cacheWrite }
 }

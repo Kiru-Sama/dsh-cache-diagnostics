@@ -52,11 +52,3 @@ export interface CacheRow {
  * @param events - the raw log in ascending sequence order.
  */
 export declare function rowsFromEvents(sessionId: string, initialTitle: string | undefined, events: readonly unknown[]): CacheRow[];
-/** The page's own summary line. */
-export declare function summarize(rows: readonly CacheRow[]): {
-    count: number;
-    hitRate?: number;
-    input: number;
-    cacheRead: number;
-    cacheWrite: number;
-};

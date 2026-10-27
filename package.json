@@ -34,7 +34,7 @@
     "build": "rimraf lib && tsc -p tsconfig.build.json && esbuild src/index.ts --bundle --format=esm --platform=neutral --target=es2022 --outfile=lib/index.js \"--external:@deepseek-ai/*\" --external:react --external:react/jsx-runtime && node scripts/build-client.mjs",
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "pack:latest": "pnpm pack",
-    "test": "esbuild test/logic.test.ts --bundle --platform=node --format=esm --outfile=node_modules/.cache/logic.test.mjs && node node_modules/.cache/logic.test.mjs"
+    "test": "esbuild test/rows.test.ts --bundle --platform=node --format=esm --outfile=node_modules/.cache/rows.test.mjs && node node_modules/.cache/rows.test.mjs"
   },
   "dsh": {
     "bundle": {

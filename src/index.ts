@@ -19,8 +19,6 @@ export const name = 'dsh-cache-diagnostics'
 const PATH = '/cache-diagnostics/v2'
 /** Newest sessions considered on one pass; the route must stay cheap. */
 const MAX_SESSIONS = 12
-/** Rows are recomputed at most this often, however often the page polls. */
-const MIN_INTERVAL_MS = 1500
 
 interface QueryService {
   listSessions(signal?: AbortSignal): Promise<readonly { header: { id: string }; live?: boolean }[]>
@@ -41,7 +39,6 @@ interface CtxLike {
 /** Cached rows per Session, invalidated by the log's last sequence. */
 const cache = new Map<string, { lastSeq: number; title: string | undefined; rows: CacheRow[] }>()
 
-let lastComputed = 0
 let lastPayload: { ok: true; rows: CacheRow[]; sessions: number; errors?: string[]; timings?: Record<string, number> } | undefined
 /** One computation at a time; the page polls and must never stack reads. */
 let computing = false
@@ -188,7 +185,6 @@ export function apply(ctx: CtxLike): void {
                   errors: computed.errors,
                   timings: computed.timings,
                 }
-                lastComputed = Date.now()
                 lastError = undefined
                 phase = 'done'
               } catch (error) {
