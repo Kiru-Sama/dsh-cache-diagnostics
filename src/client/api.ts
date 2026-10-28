@@ -12,7 +12,7 @@ const ENDPOINT = '/cache-diagnostics/v2'
 /** Idle refresh: the page stays live without a busy loop. */
 const POLL_MS = 4000
 /** While the Host is folding logs, back off so scans do not queue up. */
-const PENDING_MS = 12000
+const PENDING_MS = 8000
 /** A hidden tab does not need live numbers. */
 const HIDDEN_MS = 30000
 
@@ -117,6 +117,11 @@ function start(): void {
   }
 
   void loop()
+}
+
+/** Manual refresh from the page; harmless while another poll is in flight. */
+export function refreshRows(): void {
+  void tick(new AbortController().signal)
 }
 
 function subscribe(listener: () => void): () => void {

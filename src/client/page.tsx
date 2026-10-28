@@ -8,7 +8,7 @@
  */
 
 import { createElement, useEffect, useMemo, useState, type ReactElement } from 'react'
-import { useRows, type Row } from './api'
+import { refreshRows, useRows, type Row } from './api'
 
 const STYLE_ID = 'dsh-cache-diagnostics-page'
 
@@ -67,6 +67,22 @@ const CSS = `
 .cdx-unit.is-active {
   background: var(--dsw-alias-interactive-bg-hover);
   color: var(--dsw-alias-label-primary); font-weight: 500;
+}
+.cdx-select {
+  max-width: 260px; padding: 2px 6px; border-radius: 6px; cursor: pointer;
+  border: 1px solid var(--dsw-alias-border-l1);
+  background: var(--dsw-alias-bg-layer-1); color: var(--dsw-alias-label-secondary);
+  font: inherit; font-size: 11px; line-height: 18px;
+}
+.cdx-select:hover { color: var(--dsw-alias-label-primary); }
+.cdx-refresh {
+  padding: 2px 10px; border-radius: 6px; cursor: pointer;
+  border: 1px solid var(--dsw-alias-border-l1); background: transparent;
+  color: var(--dsw-alias-label-secondary); font: inherit; font-size: 11px; line-height: 18px;
+}
+.cdx-refresh:hover {
+  background: var(--dsw-alias-interactive-bg-hover);
+  color: var(--dsw-alias-label-primary);
 }
 .cdx-table { width: 100%; border-collapse: collapse; font-size: 12px; font-variant-numeric: tabular-nums; }
 .cdx-table th {
@@ -170,8 +186,6 @@ export function CacheDiagnosticsPage(): ReactElement {
       /* storage disabled: the choice still holds for this page */
     }
   }, [unit])
-  /** Rendering tens of thousands of rows freezes the page; the newest slice is enough. */
-  const visible = useMemo(() => rows.slice(0, 300), [rows])
   const latest = rows.length === 0 ? undefined : rows[0]
   const totals = useMemo(() => {
     let input = 0
@@ -185,6 +199,44 @@ export function CacheDiagnosticsPage(): ReactElement {
     const total = input + cacheRead + cacheWrite
     return { input, cacheRead, cacheWrite, hitRate: total > 0 ? cacheRead / total : undefined }
   }, [rows])
+
+  /** Sessions present in the data, newest activity first. */
+  const sessions = useMemo(() => {
+    const byId = new Map<string, { id: string; title: string; count: number; latest: number }>()
+    for (const row of rows) {
+      const entry = byId.get(row.sessionId)
+      if (entry === undefined) {
+        byId.set(row.sessionId, { id: row.sessionId, title: sessionOf(row), count: 1, latest: row.time })
+      } else {
+        entry.count += 1
+        if (row.time > entry.latest) entry.latest = row.time
+      }
+    }
+    return [...byId.values()].sort((left, right) => right.latest - left.latest)
+  }, [rows])
+
+  const [scope, setScope] = useState<string>('all')
+
+  /**
+   * The newest rows of ONE chatty session would otherwise crowd every other
+   * session out of the table, so the "all" view keeps a fair slice per Session
+   * before merging.
+   */
+  const visible = useMemo(() => {
+    if (scope !== 'all') {
+      return rows.filter(row => row.sessionId === scope).slice(0, 300)
+    }
+    const seen = new Map<string, number>()
+    const merged: Row[] = []
+    for (const row of rows) {
+      const count = seen.get(row.sessionId) ?? 0
+      if (count >= 40) continue
+      seen.set(row.sessionId, count + 1)
+      merged.push(row)
+      if (merged.length >= 600) break
+    }
+    return merged
+  }, [rows, scope])
 
   return createElement(
     'div',
@@ -215,7 +267,29 @@ export function CacheDiagnosticsPage(): ReactElement {
         : createElement(
             'div',
             { className: 'cdx-toolbar' },
-            createElement('strong', { style: { fontSize: 13, fontWeight: 600 } }, '全部请求'),
+            createElement(
+              'span',
+              { style: { display: 'inline-flex', alignItems: 'center', gap: 8 } },
+              createElement('strong', { style: { fontSize: 13, fontWeight: 600 } }, '全部请求'),
+              createElement(
+                'select',
+                {
+                  className: 'cdx-select',
+                  value: scope,
+                  title: '按会话筛选',
+                  onChange: (event: { target: { value: string } }) => setScope(event.target.value),
+                },
+                createElement('option', { value: 'all' }, `全部会话（${sessions.length}）`),
+                ...sessions.map(session =>
+                  createElement('option', { value: session.id }, `${session.title}（${session.count}）`),
+                ),
+              ),
+              createElement(
+                'button',
+                { type: 'button', className: 'cdx-refresh', onClick: refreshRows, title: '立即刷新' },
+                '刷新',
+              ),
+            ),
             createElement(
               'span',
               { className: 'cdx-units', title: '命中率显示单位' },
@@ -236,9 +310,10 @@ export function CacheDiagnosticsPage(): ReactElement {
         : createElement(
             'p',
             { className: 'cdx-count' },
-            `${rows.length} 次请求${rows.length > visible.length ? `（显示最新 ${visible.length}）` : ''} · 合计命中 ${formatRate(totals.hitRate, unit)} · `
+            `${rows.length} 次请求${rows.length > visible.length ? `（显示 ${visible.length}）` : ''} · 合计命中 ${formatRate(totals.hitRate, unit)} · `
               + `未缓存 ${tokens(totals.input)} / 缓存读 ${tokens(totals.cacheRead)} / 缓存写 ${tokens(totals.cacheWrite)}`
-              + (updatedAt === undefined ? '' : ` · 更新于 ${clockOf(updatedAt)}`),
+              + (updatedAt === undefined ? '' : ` · 更新于 ${clockOf(updatedAt)}`)
+              + (pending === true ? ' · 后台计算中' : ''),
           ),
       latest === undefined
         ? null
